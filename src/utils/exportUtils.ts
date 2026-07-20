@@ -22,64 +22,73 @@ export async function exportToPDF(
   hiddenRoot.style.position = 'fixed'
   hiddenRoot.style.left = '-9999px'
   hiddenRoot.style.top = '0'
-  hiddenRoot.style.width = '1200px'
+  hiddenRoot.style.width = '720px'
   hiddenRoot.style.height = 'auto'
   hiddenRoot.style.overflow = 'hidden'
   hiddenRoot.style.pointerEvents = 'none'
   hiddenRoot.style.opacity = '0'
-  hiddenRoot.style.display = 'grid'
-  hiddenRoot.style.gridTemplateColumns = '1fr'
-  hiddenRoot.style.gap = '20px'
+  hiddenRoot.style.backgroundColor = '#ffffff'
   document.body.appendChild(hiddenRoot)
 
-  const cardElements = cards.map((card) => {
-    const existingCard = document.querySelector<HTMLElement>(`[data-export-card-id="${card.id}"]`)
-    const element = existingCard
-      ? cloneCardElement(existingCard)
-      : createCardExportElement(card, songs, playedSongs)
-
-    hiddenRoot.appendChild(element)
-    return element
-  })
-
   const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
   const margin = 10
   const printableWidth = pageWidth - margin * 2
+  const cardsPerPage = 3
+  const spacing = 10
+  const maxSlotHeight = (pageHeight - margin * 2 - spacing * (cardsPerPage - 1)) / cardsPerPage
 
-  for (let i = 0; i < cardElements.length; i++) {
-    const cardElement = cardElements[i]
+  const images: string[] = []
+  for (let i = 0; i < cards.length; i++) {
+    const cardElement = createCardExportElement(cards[i], songs, playedSongs)
+    hiddenRoot.appendChild(cardElement)
+
     const canvas = await html2canvas(cardElement, {
       backgroundColor: '#ffffff',
-      scale: 2,
+      scale: 3,
       useCORS: true,
       logging: false,
     })
 
-    const imgData = canvas.toDataURL('image/png')
-    const imgWidth = printableWidth
-    const imgHeight = (canvas.height / canvas.width) * imgWidth
+    hiddenRoot.removeChild(cardElement)
+    images.push(canvas.toDataURL('image/png'))
+  }
 
+  for (let i = 0; i < images.length; i += cardsPerPage) {
     if (i > 0) {
       pdf.addPage()
     }
 
-    pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight)
+    for (let cardIndex = 0; cardIndex < cardsPerPage; cardIndex++) {
+      const index = i + cardIndex
+      if (index >= images.length) {
+        break
+      }
+
+      const imgData = images[index]
+      const img = new Image()
+      const loaded = new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('Failed to load image for PDF export'))
+      })
+      img.src = imgData
+      await loaded
+
+      let imgWidth = printableWidth
+      let imgHeight = (img.height / img.width) * imgWidth
+      if (imgHeight > maxSlotHeight) {
+        imgHeight = maxSlotHeight
+        imgWidth = (img.width / img.height) * imgHeight
+      }
+
+      const x = margin + (printableWidth - imgWidth) / 2
+      const y = margin + cardIndex * (maxSlotHeight + spacing) + (maxSlotHeight - imgHeight) / 2
+      pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight)
+    }
   }
 
   document.body.removeChild(hiddenRoot)
   pdf.save('bingo-cartas.pdf')
-}
-
-function cloneCardElement(element: HTMLElement): HTMLElement {
-  const clone = element.cloneNode(true) as HTMLElement
-  clone.style.display = 'block'
-  clone.style.width = '820px'
-  clone.style.margin = '0'
-  clone.style.padding = '20px'
-  clone.style.backgroundColor = '#ffffff'
-  clone.style.boxSizing = 'border-box'
-  clone.style.position = 'relative'
-  return clone
 }
 
 function createCardExportElement(
@@ -94,10 +103,22 @@ function createCardExportElement(
   )
 
   const wrapper = document.createElement('div')
-  wrapper.style.width = '820px'
+  wrapper.style.width = '720px'
+  wrapper.style.maxWidth = '720px'
   wrapper.style.padding = '20px'
   wrapper.style.backgroundColor = '#ffffff'
   wrapper.style.boxSizing = 'border-box'
+  wrapper.style.border = '4px solid #000000'
+  wrapper.style.borderRadius = '24px'
+  wrapper.style.boxShadow = 'none'
+
+  const ringIcon = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" style="color: #000000; margin-bottom: 6px;">
+      <circle cx="8" cy="12" r="4" />
+      <circle cx="14" cy="12" r="4" />
+      <path d="M10.5 8.5l3 0" />
+    </svg>
+  `
 
   const cellsHtml = Array.from({ length: 8 })
     .map((_, cellIndex) => {
@@ -107,14 +128,15 @@ function createCardExportElement(
       const isMarked = !isFree && playedTitles.has(song)
 
       return `
-        <div class="bingo-cell ${isFree ? 'bingo-cell.free' : ''} aspect-square" style="background-color: ${isFree ? '#f3e8ff' : 'white'}; border-color: black; border-width: 2px; display: flex; align-items: center; justify-content: center;">
+        <div class="bingo-cell ${isFree ? 'bingo-cell.free' : ''} aspect-square" style="background-color: ${isFree ? '#e5e7eb' : 'white'}; border-color: black; border-width: 2px; display: flex; align-items: center; justify-content: center;">
           ${isFree ? `
-            <div class="flex flex-col items-center justify-center h-full">
-              <span class="text-xs font-bold text-black">J&A</span>
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 6px; padding: 8px;">
+              ${ringIcon}
+              <span style="font-size: 10px; font-weight: 700; color: #000000; text-transform: uppercase; letter-spacing: 0.12em;">Libre</span>
             </div>
           ` : `
-            <span class="text-xs font-semibold text-black leading-tight px-1 py-2 line-clamp-4 ${
-              isMarked ? 'bg-green-100 text-green-800 rounded-md' : ''
+            <span style="font-size: 12px; font-weight: 600; color: #000000; line-height: 1.2; padding: 8px; display: block; text-align: center; ${
+              isMarked ? 'background-color: #d1d5db; color: #000000; border-radius: 10px; border: 1px solid #000000;' : ''
             }">
               ${song}
             </span>
@@ -125,14 +147,15 @@ function createCardExportElement(
     .join('')
 
   wrapper.innerHTML = `
-    <div class="text-center mb-4">
-      <h3 class="text-xl font-bold text-black">Carta #${card.cardNumber}</h3>
+    <div style="text-align: center; margin-bottom: 16px;">
+      <h3 style="font-size: 20px; font-weight: 700; color: #000000; margin: 0;">Carta #${card.cardNumber}</h3>
+      <p style="font-size: 10px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; margin: 6px 0 0; color: #1f2937;">Bingo Musical</p>
     </div>
-    <div class="grid grid-cols-4 gap-0 border-4 border-black">
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 4px solid #000000; border-radius: 20px; overflow: hidden;">
       ${cellsHtml}
     </div>
-    <div class="mt-4 text-center">
-      <p class="text-xs text-gray-600">Fecha: ${new Date(card.createdAt).toLocaleDateString()}</p>
+    <div style="margin-top: 16px; text-align: center; padding: 16px; border: 2px dashed #000000; border-radius: 18px; background-color: #e5e7eb;">
+      <p style="font-size: 13px; font-weight: 600; color: #000000; margin: 0;">¡Gracias por acompañarnos en este día tan especial!</p>
     </div>
   `
 

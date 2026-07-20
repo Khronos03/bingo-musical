@@ -34,15 +34,44 @@
   }
 
   .bingo-card {
-    @apply bg-white text-black border-4 border-black rounded-lg p-4 shadow-lg;
+    @apply bg-white text-black border-4 border-black rounded-3xl p-4 shadow-none;
   }
 
-  .bingo-cell {
-    @apply border-2 border-black flex items-center justify-center text-center aspect-square bg-white overflow-hidden;
+  .bingo-card > div:first-child {
+    @apply mb-4;
   }
 
-  .bingo-cell.free {
-    @apply bg-gradient-to-br from-primary/20 to-secondary/20;
+  .bingo-card h3 {
+    @apply text-xl font-bold tracking-tight;
+  }
+
+  .bingo-card p {
+    @apply text-[11px] text-slate-600;
+  }
+
+  .bingo-card .bingo-cell {
+    @apply border-2 border-black flex items-center justify-center text-center aspect-square bg-white overflow-hidden px-2 py-2;
+  }
+
+  .bingo-card .bingo-cell.free {
+    @apply bg-slate-200 border-dashed border-black;
+  }
+
+  .bingo-card .bingo-cell span {
+    @apply leading-tight text-[11px] font-semibold;
+  }
+
+  .bingo-card .bingo-cell span.bg-slate-300,
+  .bingo-card .bingo-cell span.bg-slate-300 {
+    @apply border border-black rounded-lg px-2 py-1;
+  }
+
+  .bingo-card .rounded-2xl {
+    @apply border border-black bg-slate-100;
+  }
+
+  .bingo-card .rounded-full {
+    @apply border border-black bg-slate-100;
   }
 
   .progress-bar {
@@ -51,6 +80,16 @@
 
   .progress-fill {
     @apply h-full bg-gradient-to-r from-primary to-secondary transition-all duration-300;
+  }
+
+  .bingo-card {
+    page-break-inside: avoid;
+    background: white;
+  }
+
+  .bingo-cell,
+  .bingo-cell.free {
+    color: black;
   }
 }
 

@@ -34,9 +34,6 @@ export interface BingoState {
   resetPlayback: () => void
   
   toggleDarkMode: () => void
-  
-  loadFromStorage: () => void
-  saveToStorage: () => void
 }
 
 export interface PlaybackState {

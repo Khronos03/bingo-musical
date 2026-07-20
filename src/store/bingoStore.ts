@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { BingoCard, Song, BingoState } from '@/types'
 import { generateUniqueBingoCards } from '@/utils/cardGenerator'
 import { exportToPDF, exportCardToPNG } from '@/utils/exportUtils'
+import { persistCards, persistSongs } from '@/utils/dataPersistence'
 import songsData from '@/data/songs.json'
 import cardsData from '@/data/cards.json'
 
@@ -42,6 +43,7 @@ export const useBingoStore = create<BingoState>((set, get) => ({
         addedAt: Date.now(),
       }
       const newSongs = [...state.songs, newSong]
+      persistSongs(newSongs)
       return { songs: newSongs }
     })
   },
@@ -51,6 +53,7 @@ export const useBingoStore = create<BingoState>((set, get) => ({
       const newSongs = state.songs.map((song) =>
         song.id === id ? { ...song, title: title.trim() } : song,
       )
+      persistSongs(newSongs)
       return { songs: newSongs }
     })
   },
@@ -58,6 +61,7 @@ export const useBingoStore = create<BingoState>((set, get) => ({
   deleteSong: (id: string) => {
     set((state) => {
       const newSongs = state.songs.filter((song) => song.id !== id)
+      persistSongs(newSongs)
       return { songs: newSongs }
     })
   },
@@ -72,7 +76,9 @@ export const useBingoStore = create<BingoState>((set, get) => ({
           title,
           addedAt: Date.now(),
         }))
-      return { songs: [...state.songs, ...newSongs] }
+      const songs = [...state.songs, ...newSongs]
+      persistSongs(songs)
+      return { songs }
     })
   },
 
@@ -96,7 +102,9 @@ export const useBingoStore = create<BingoState>((set, get) => ({
           cardNumber: startNumber + index,
           createdAt: Date.now(),
         }))
-        return { cards: [...state.cards, ...cardsWithNumbers] }
+        const cards = [...state.cards, ...cardsWithNumbers]
+        persistCards(cards)
+        return { cards }
       })
 
       return true
@@ -107,6 +115,7 @@ export const useBingoStore = create<BingoState>((set, get) => ({
 
   clearCards: () => {
     set({ cards: [] })
+    persistCards([])
   },
 
   exportCardsToPDF: async () => {
