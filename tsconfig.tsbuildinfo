@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/bingocard.tsx","./src/components/cardgenerator.tsx","./src/components/cardviewer.tsx","./src/components/playbackmode.tsx","./src/components/songmanager.tsx","./src/components/themetoggle.tsx","./src/store/bingostore.ts","./src/types/index.ts","./src/utils/cardgenerator.ts","./src/utils/exportutils.ts"],"version":"5.9.3"}

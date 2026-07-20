@@ -1,0 +1,157 @@
+import { create } from 'zustand'
+import type { BingoCard, Song, BingoState } from '@/types'
+import { generateUniqueBingoCards } from '@/utils/cardGenerator'
+import { exportToPDF, exportCardToPNG } from '@/utils/exportUtils'
+import songsData from '@/data/songs.json'
+import cardsData from '@/data/cards.json'
+
+function findWinningCardId(
+  cards: BingoCard[],
+  songs: Song[],
+  playedSongIds: Set<string>,
+): string | null {
+  const playedTitles = new Set(
+    songs
+      .filter((song) => playedSongIds.has(song.id))
+      .map((song) => song.title),
+  )
+
+  for (const card of cards) {
+    const isWinner = card.songs.every((title) => playedTitles.has(title))
+    if (isWinner) {
+      return card.id
+    }
+  }
+
+  return null
+}
+
+export const useBingoStore = create<BingoState>((set, get) => ({
+  songs: songsData,
+  cards: cardsData,
+  currentSongIndex: null,
+  playedSongs: new Set(),
+  winningCardId: null,
+  isDarkMode: true,
+
+  addSong: (title: string) => {
+    set((state) => {
+      const newSong: Song = {
+        id: Date.now().toString(),
+        title: title.trim(),
+        addedAt: Date.now(),
+      }
+      const newSongs = [...state.songs, newSong]
+      return { songs: newSongs }
+    })
+  },
+
+  editSong: (id: string, title: string) => {
+    set((state) => {
+      const newSongs = state.songs.map((song) =>
+        song.id === id ? { ...song, title: title.trim() } : song,
+      )
+      return { songs: newSongs }
+    })
+  },
+
+  deleteSong: (id: string) => {
+    set((state) => {
+      const newSongs = state.songs.filter((song) => song.id !== id)
+      return { songs: newSongs }
+    })
+  },
+
+  importSongs: (titles: string[]) => {
+    set((state) => {
+      const newSongs = titles
+        .map((title) => title.trim())
+        .filter((title) => title.length > 0)
+        .map((title) => ({
+          id: Date.now().toString() + Math.random(),
+          title,
+          addedAt: Date.now(),
+        }))
+      return { songs: [...state.songs, ...newSongs] }
+    })
+  },
+
+  generateCards: async (count: number) => {
+    const state = get()
+    if (state.songs.length < 7) {
+      return false
+    }
+
+    try {
+      const newCards = generateUniqueBingoCards(
+        state.songs.map((s) => s.title),
+        count,
+      )
+
+      set((state) => {
+        const startNumber = state.cards.length + 1
+        const cardsWithNumbers = newCards.map((card, index) => ({
+          ...card,
+          id: `card-${Date.now()}-${index}`,
+          cardNumber: startNumber + index,
+          createdAt: Date.now(),
+        }))
+        return { cards: [...state.cards, ...cardsWithNumbers] }
+      })
+
+      return true
+    } catch {
+      return false
+    }
+  },
+
+  clearCards: () => {
+    set({ cards: [] })
+  },
+
+  exportCardsToPDF: async () => {
+    const state = get()
+    await exportToPDF(state.cards, state.songs, state.playedSongs)
+  },
+
+  exportCardToPNG: async (cardId: string) => {
+    const state = get()
+    const card = state.cards.find((c) => c.id === cardId)
+    if (card) {
+      await exportCardToPNG(card, state.songs, state.playedSongs)
+    }
+  },
+
+  playNextSong: () => {
+    set((state) => {
+      const playedSet = new Set(state.playedSongs)
+      const unplayedSongs = state.songs.filter((s) => !playedSet.has(s.id))
+
+      if (unplayedSongs.length === 0) {
+        return { currentSongIndex: null, playedSongs: new Set(), winningCardId: null }
+      }
+
+      const randomIndex = Math.floor(Math.random() * unplayedSongs.length)
+      const selectedSong = unplayedSongs[randomIndex]
+      playedSet.add(selectedSong.id)
+      const winningCardId = findWinningCardId(state.cards, state.songs, playedSet)
+
+      const newIndex = state.songs.findIndex((s) => s.id === selectedSong.id)
+      return {
+        currentSongIndex: newIndex,
+        playedSongs: playedSet,
+        winningCardId,
+      }
+    })
+    const stateAfter = get()
+    return stateAfter.songs[stateAfter.currentSongIndex ?? -1]?.title || null
+  },
+
+  resetPlayback: () => {
+    set({ currentSongIndex: null, playedSongs: new Set(), winningCardId: null })
+  },
+
+  toggleDarkMode: () => {
+    set((state) => ({ isDarkMode: !state.isDarkMode }))
+  },
+}))
