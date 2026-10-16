@@ -31,7 +31,7 @@ export default function App() {
               <Music className="w-8 h-8" />
               <h1 className="text-3xl font-bold">Bingo Musical</h1>
             </div>
-            <ThemeToggle />
+            <ThemeToggle /> 
           </div>
         </header>
 
