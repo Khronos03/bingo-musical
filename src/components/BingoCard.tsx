@@ -79,6 +79,7 @@ export default function BingoCard({ card, songs, playedSongs = new Set(), isWinn
             </div>
           )
         })}
+        </div>
       </div>
 
       <div className="mt-5 rounded-3xl border-2 border-dashed border-black bg-slate-100 px-4 py-4 text-center">

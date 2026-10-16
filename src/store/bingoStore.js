@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { generateUniqueBingoCards } from '@/utils/cardGenerator';
 import { exportToPDF, exportCardToPNG } from '@/utils/exportUtils';
-const STORAGE_KEY = 'bingo-musical-data';
+import { persistCards, persistSongs } from '@/utils/dataPersistence';
+import songsData from '@/data/songs.json';
+import cardsData from '@/data/cards.json';
 function findWinningCardId(cards, songs, playedSongIds) {
     const playedTitles = new Set(songs
         .filter((song) => playedSongIds.has(song.id))
@@ -15,9 +17,9 @@ function findWinningCardId(cards, songs, playedSongIds) {
     return null;
 }
 export const useBingoStore = create((set, get) => ({
-    songs: [],
-    cards: [],
-    currentSongIndex: 0,
+    songs: songsData,
+    cards: cardsData,
+    currentSongIndex: null,
     playedSongs: new Set(),
     winningCardId: null,
     isDarkMode: true,
@@ -29,23 +31,23 @@ export const useBingoStore = create((set, get) => ({
                 addedAt: Date.now(),
             };
             const newSongs = [...state.songs, newSong];
+            persistSongs(newSongs);
             return { songs: newSongs };
         });
-        get().saveToStorage();
     },
     editSong: (id, title) => {
         set((state) => {
             const newSongs = state.songs.map((song) => song.id === id ? { ...song, title: title.trim() } : song);
+            persistSongs(newSongs);
             return { songs: newSongs };
         });
-        get().saveToStorage();
     },
     deleteSong: (id) => {
         set((state) => {
             const newSongs = state.songs.filter((song) => song.id !== id);
+            persistSongs(newSongs);
             return { songs: newSongs };
         });
-        get().saveToStorage();
     },
     importSongs: (titles) => {
         set((state) => {
@@ -57,9 +59,10 @@ export const useBingoStore = create((set, get) => ({
                 title,
                 addedAt: Date.now(),
             }));
-            return { songs: [...state.songs, ...newSongs] };
+            const songs = [...state.songs, ...newSongs];
+            persistSongs(songs);
+            return { songs };
         });
-        get().saveToStorage();
     },
     generateCards: async (count) => {
         const state = get();
@@ -76,9 +79,10 @@ export const useBingoStore = create((set, get) => ({
                     cardNumber: startNumber + index,
                     createdAt: Date.now(),
                 }));
-                return { cards: [...state.cards, ...cardsWithNumbers] };
+                const cards = [...state.cards, ...cardsWithNumbers];
+                persistCards(cards);
+                return { cards };
             });
-            get().saveToStorage();
             return true;
         }
         catch {
@@ -87,17 +91,17 @@ export const useBingoStore = create((set, get) => ({
     },
     clearCards: () => {
         set({ cards: [] });
-        get().saveToStorage();
+        persistCards([]);
     },
     exportCardsToPDF: async () => {
         const state = get();
-        await exportToPDF(state.cards);
+        await exportToPDF(state.cards, state.songs, state.playedSongs);
     },
     exportCardToPNG: async (cardId) => {
         const state = get();
         const card = state.cards.find((c) => c.id === cardId);
         if (card) {
-            await exportCardToPNG(card);
+            await exportCardToPNG(card, state.songs, state.playedSongs);
         }
     },
     playNextSong: () => {
@@ -122,42 +126,9 @@ export const useBingoStore = create((set, get) => ({
         return stateAfter.songs[stateAfter.currentSongIndex ?? -1]?.title || null;
     },
     resetPlayback: () => {
-        set({ currentSongIndex: 0, playedSongs: new Set(), winningCardId: null });
+        set({ currentSongIndex: null, playedSongs: new Set(), winningCardId: null });
     },
     toggleDarkMode: () => {
         set((state) => ({ isDarkMode: !state.isDarkMode }));
-        get().saveToStorage();
-    },
-    saveToStorage: () => {
-        const state = get();
-        const dataToSave = {
-            songs: state.songs,
-            cards: state.cards,
-            isDarkMode: state.isDarkMode,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
-    },
-    loadFromStorage: () => {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (data) {
-            try {
-                const parsed = JSON.parse(data);
-                set({
-                    songs: parsed.songs || [],
-                    cards: parsed.cards || [],
-                    isDarkMode: parsed.isDarkMode ?? true,
-                });
-            }
-            catch {
-                console.error('Failed to load data from storage');
-            }
-        }
-    },
-    hydrate: () => {
-        get().loadFromStorage();
     },
 }));
-// Hydrate store on initialization
-if (typeof window !== 'undefined') {
-    useBingoStore.getState().hydrate();
-}
